@@ -14,18 +14,38 @@ Server-side only -- players need nothing but the vanilla client.
 
 1. Make an intra app at <https://profile.intra.42.fr/oauth/applications/new>
    (the default `public` scope is enough).
-2. `cp .env.example ../.env` and fill it in. It is read from
-   `server/plugins/Coalitions/.env`, the server root, or the repo root;
-   real environment variables win over the file.
+2. Put a `.env` next to the server (copy `.env.example`) and fill it in. It is
+   read from `plugins/Coalitions/.env` or the server root; real environment
+   variables win over the file.
 
    ```
    FT_CLIENT_ID=u-s4t2ud-...
    FT_CLIENT_SECRET=s-s4t2ud-...
    FT_CAMPUS_ID=49          # which campus's coalitions count; 49 is Istanbul
    ```
-3. `./build.sh` -- builds and drops the jar in `../server/plugins`. It fetches
-   its own JDK 25 and Maven into `.tools/` if the machine has neither.
-4. `../server.sh`, then `coalition houses` in the console to check.
+3. Grab `Coalitions-x.y.z.jar` from the
+   [releases](https://github.com/0xmthan/42coalitions-mc/releases) and drop it in
+   the server's `plugins/` folder.
+4. Start the server, then `coalition houses` in the console to check.
+
+## Building
+
+For local testing:
+
+```
+./build.sh                         # jar lands in target/Coalitions.jar
+./build.sh --install ~/my-server   # also drops it in ~/my-server/plugins
+```
+
+It uses the JDK 25+ and Maven already on the machine, or fetches them into
+`.tools/` if there are none.
+
+Releases are built by GitHub Actions: push a version tag and the jar is built
+and attached to a new release.
+
+```
+git tag v1.0.0 && git push origin v1.0.0
+```
 
 `.env` is only needed to *run*; the build never reads it. `/coalition reload`
 picks up changes to it and to `config.yml` without a restart.

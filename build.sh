@@ -1,35 +1,52 @@
 #!/usr/bin/env bash
 #
-# Build the Coalitions plugin and (by default) install it into ../server/plugins.
+# Build the Coalitions plugin for local testing. Release jars are built by
+# .github/workflows/release.yml instead.
 #
 # Usage:
-#   ./build.sh                # build + install into ../server/plugins
-#   ./build.sh --no-install   # build only, jar lands in ./target
+#   ./build.sh                    # build only, jar lands in ./target
+#   ./build.sh --install <server> # build + drop the jar in <server>/plugins
 #
-# Bootstraps a JDK 25 and Maven under ../.tools if the machine has none.
+# Bootstraps a JDK 25 and Maven under ./.tools if the machine has none.
 #
 # Env overrides:
 #   JAVA_HOME     JDK to build with (must be >= 25)
 #   MVN           maven binary to use
-#   SERVER_ROOT   where to install     (default ../server)
+#   SERVER_ROOT   same as --install <server>
 
 set -euo pipefail
 
 HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-SERVER_ROOT="${SERVER_ROOT:-$(cd -- "${HERE}/.." && pwd)/server}"
-# Shared with the other plugins, so the JDK and Maven are fetched once.
-TOOLS="$(cd -- "${HERE}/.." && pwd)/.tools"
+SERVER_ROOT="${SERVER_ROOT:-}"
+TOOLS="${HERE}/.tools"
 
 JAVA_MIN=25
 MAVEN_VERSION=3.9.16
-JDK_URL="https://api.adoptium.net/v3/binary/latest/${JAVA_MIN}/ga/linux/x64/jdk/hotspot/normal/eclipse"
 MAVEN_URL="https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz"
-
-INSTALL=1
-[ "${1:-}" = "--no-install" ] && INSTALL=0
 
 log() { printf '\033[1;32m==>\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[1;31mxx\033[0m %s\n' "$*" >&2; exit 1; }
+usage() { sed -n '6,8s/^# \{0,1\}//p' "${BASH_SOURCE[0]}" >&2; exit "${1:-2}"; }
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --install)  [ $# -ge 2 ] || usage; SERVER_ROOT="$2"; shift 2 ;;
+        -h|--help)  usage 0 ;;
+        *)          usage ;;
+    esac
+done
+
+case "$(uname -s)" in
+    Linux)  JDK_OS=linux ;;
+    Darwin) JDK_OS=mac ;;
+    *)      JDK_OS="" ;;
+esac
+case "$(uname -m)" in
+    x86_64|amd64)  JDK_ARCH=x64 ;;
+    arm64|aarch64) JDK_ARCH=aarch64 ;;
+    *)             JDK_ARCH="" ;;
+esac
+JDK_URL="https://api.adoptium.net/v3/binary/latest/${JAVA_MIN}/ga/${JDK_OS}/${JDK_ARCH}/jdk/hotspot/normal/eclipse"
 
 if command -v curl >/dev/null; then
     fetch() { curl -fL --retry 3 --retry-delay 2 -o "$2" "$1"; }
@@ -52,11 +69,18 @@ find_jdk() {
     for c in "${JAVA_HOME:-/nonexistent}" "${TOOLS}/jdk" /usr/lib/jvm/*; do
         javac_ok "${c}/bin/javac" && { printf '%s' "${c}"; return; }
     done
+    # Whatever javac is on PATH (Homebrew and the like), resolved to its home.
+    if c="$(command -v javac)" && javac_ok "${c}"; then
+        c="$(cd -- "$(dirname -- "$(readlink -f -- "${c}")")/.." && pwd)"
+        printf '%s' "${c}"; return
+    fi
     printf ''
 }
 
 JDK="$(find_jdk)"
 if [ -z "${JDK}" ]; then
+    [ -n "${JDK_OS}" ] && [ -n "${JDK_ARCH}" ] \
+        || die "no JDK ${JAVA_MIN}+ found and no download for $(uname -sm) -- set JAVA_HOME"
     log "Downloading Temurin JDK ${JAVA_MIN} (no JDK ${JAVA_MIN}+ on this machine)"
     mkdir -p "${TOOLS}"
     stage="$(mktemp -d "${TOOLS}/.jdk-stage.XXXXXX")"
@@ -114,14 +138,14 @@ warn_if_running() {
 
 # --- build ----------------------------------------------------------------
 cd -- "${HERE}"
-"${MVN}" -q -B -Dmaven.repo.local="${TOOLS}/m2" clean install
+"${MVN}" -q -B -Dmaven.repo.local="${TOOLS}/m2" clean package
 
 JAR="${HERE}/target/Coalitions.jar"
 [ -s "${JAR}" ] || die "build produced no jar"
 log "Built ${JAR}"
 
-if [ "${INSTALL}" = 1 ]; then
-    [ -d "${SERVER_ROOT}" ] || die "no server dir at ${SERVER_ROOT} (use --no-install)"
+if [ -n "${SERVER_ROOT}" ]; then
+    [ -d "${SERVER_ROOT}" ] || die "no server dir at ${SERVER_ROOT}"
     mkdir -p "${SERVER_ROOT}/plugins"
     install_jar "${JAR}" "${SERVER_ROOT}/plugins/Coalitions.jar"
     log "Installed into ${SERVER_ROOT}/plugins/"

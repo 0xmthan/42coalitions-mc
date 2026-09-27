@@ -1,0 +1,45 @@
+# Release build. Push a version tag and this builds the jar and publishes it as
+# a GitHub release:
+#
+#   git tag v1.0.0 && git push origin v1.0.0
+#
+# The tag sets the version (v1.2.3 -> 1.2.3 in pom.xml and plugin.yml), so the
+# pom's own version does not need bumping by hand.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Set version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          mvn -B -ntp versions:set -DnewVersion="${VERSION}" -DgenerateBackupPoms=false
+
+      - name: Build
+        run: mvn -B -ntp clean package
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp target/Coalitions.jar "Coalitions-${VERSION}.jar"
+          gh release create "$GITHUB_REF_NAME" "Coalitions-${VERSION}.jar" \
+            --title "Coalitions ${VERSION}" --generate-notes
