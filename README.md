@@ -23,7 +23,7 @@ Server-side only -- players need nothing but the vanilla client.
    FT_CLIENT_SECRET=s-s4t2ud-...
    FT_CAMPUS_ID=49          # which campus's coalitions count; 49 is Istanbul
    ```
-3. Grab `Coalitions-x.y.z.jar` from the
+3. Grab `42coalitions-x.y.z.jar` from the
    [releases](https://github.com/0xmthan/42coalitions-mc/releases) and drop it in
    the server's `plugins/` folder.
 4. Start the server, then `coalition houses` in the console to check.
@@ -40,11 +40,12 @@ For local testing:
 It uses the JDK 25+ and Maven already on the machine, or fetches them into
 `.tools/` if there are none.
 
-Releases are built by GitHub Actions: push a version tag and the jar is built
-and attached to a new release.
+Releases are built by GitHub Actions: push a commit to `main` whose message is
+just the version, and it is tagged, built and published as a release with
+`42coalitions-1.2.3.jar` attached.
 
 ```
-git tag v1.0.0 && git push origin v1.0.0
+git commit -m "v1.2.3" && git push
 ```
 
 `.env` is only needed to *run*; the build never reads it. `/coalition reload`

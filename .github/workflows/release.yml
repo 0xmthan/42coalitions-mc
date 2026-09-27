@@ -1,45 +1,70 @@
-# Release build. Push a version tag and this builds the jar and publishes it as
-# a GitHub release:
+# Release build. Push a commit to main whose message is a version and this tags
+# it, builds the jar and publishes it as a GitHub release:
 #
-#   git tag v1.0.0 && git push origin v1.0.0
+#   git commit -m "v1.2.3" && git push
 #
-# The tag sets the version (v1.2.3 -> 1.2.3 in pom.xml and plugin.yml), so the
-# pom's own version does not need bumping by hand.
+# v1.2 counts as 1.2.0. The version comes from the commit message (it goes into
+# pom.xml and plugin.yml), so the pom's own version does not need bumping.
 
 name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
 
 permissions:
   contents: write
 
 jobs:
   release:
+    if: startsWith(github.event.head_commit.message, 'v')
     runs-on: ubuntu-latest
     steps:
+      - name: Read version from commit message
+        id: version
+        env:
+          MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          subject="$(printf '%s\n' "$MESSAGE" | head -n1 | tr -d '[:space:]')"
+          if [[ ! "$subject" =~ ^v([0-9]+)(\.([0-9]+))?(\.([0-9]+))?$ ]]; then
+            echo "\"$subject\" is not a version, nothing to release"
+            exit 0
+          fi
+          VERSION="${BASH_REMATCH[1]}.${BASH_REMATCH[3]:-0}.${BASH_REMATCH[5]:-0}"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "release=true" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v5
+        if: steps.version.outputs.release
+
+      - name: Check the tag is new
+        if: steps.version.outputs.release
+        run: |
+          git fetch --tags -q
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            echo "::error::v${VERSION} is already released -- bump the version"
+            exit 1
+          fi
 
       - uses: actions/setup-java@v5
+        if: steps.version.outputs.release
         with:
           distribution: temurin
           java-version: "25"
           cache: maven
 
-      - name: Set version from tag
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
-          mvn -B -ntp versions:set -DnewVersion="${VERSION}" -DgenerateBackupPoms=false
-
       - name: Build
-        run: mvn -B -ntp clean package
+        if: steps.version.outputs.release
+        run: |
+          mvn -B -ntp versions:set -DnewVersion="${VERSION}" -DgenerateBackupPoms=false
+          mvn -B -ntp clean package
 
+      # gh creates the tag on this commit along with the release.
       - name: Publish release
+        if: steps.version.outputs.release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp target/Coalitions.jar "Coalitions-${VERSION}.jar"
-          gh release create "$GITHUB_REF_NAME" "Coalitions-${VERSION}.jar" \
-            --title "Coalitions ${VERSION}" --generate-notes
+          cp target/Coalitions.jar "42coalitions-${VERSION}.jar"
+          gh release create "v${VERSION}" "42coalitions-${VERSION}.jar" \
+            --target "$GITHUB_SHA" --title "42coalitions ${VERSION}" --generate-notes
