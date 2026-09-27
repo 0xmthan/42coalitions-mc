@@ -1,0 +1,128 @@
+# Coalitions -- 42 intra coalitions as in-game teams.
+#
+# Tokens are NOT stored here. Put them in a .env file, looked up in this order:
+#   plugins/Coalitions/.env    <server root>/.env    <repo root>/.env
+# Real environment variables win over all of them.
+#
+#   FT_CLIENT_ID=your_application_uid
+#   FT_CLIENT_SECRET=your_application_secret
+#   FT_CAMPUS_ID=49
+#
+# Credentials come from https://profile.intra.42.fr/oauth/applications
+# (the default "public" scope is enough).
+
+intra:
+  base-url: "https://api.intra.42.fr"
+
+  # Which campus's coalitions count. A campus runs one bloc of coalitions per
+  # cursus -- the houses cadets are sorted into, plus a separate set for every
+  # piscine -- so this is what tells a real house from a piscine one.
+  # 0 falls back to FT_CAMPUS_ID, and failing that accepts any coalition a
+  # player belongs to. 49 is Istanbul.
+  campus-id: 0
+
+  # 21 is the 42cursus. Leave it alone unless you know why.
+  cursus-id: 21
+
+  # The intra's published limit is 2 requests/second. Stay at or under it.
+  requests-per-second: 2.0
+  timeout-seconds: 10
+
+login:
+  # Refuse players whose Minecraft name matches no 42 login, or whose 42 account
+  # is in none of the coalitions above. False lets everyone in, uncoloured.
+  require-coalition: true
+
+  # What to do when the intra cannot be reached and the name is not cached:
+  #   deny  -- nobody new gets in while the API is down
+  #   allow -- let them in uncoloured and with no team
+  on-api-error: deny
+
+  # Minecraft names that skip the lookup entirely (admins, bots). These still
+  # work when the intra is down or the credentials are missing.
+  bypass: []
+  #  bypass:
+  #    - Notch
+
+  # Minecraft name -> 42 login, for players whose in-game name differs.
+  # Everyone else is looked up by their lowercased Minecraft name.
+  aliases: {}
+  #  aliases:
+  #    XxSniperxX: jdoe
+
+  # MiniMessage. <name> is the Minecraft name, <error> the failure reason.
+  messages:
+    unknown-user: |-
+      <red>You are not on a 42 coalition.</red>
+
+      <gray>The intra has no user named <white><name></white>.
+      Join with your intra login as your Minecraft username.</gray>
+    no-coalition: |-
+      <red>Your 42 account has no coalition.</red>
+
+      <gray><white><name></white> exists on the intra but belongs to none of
+      this campus's coalitions.</gray>
+    api-error: |-
+      <red>Could not reach the 42 API.</red>
+
+      <gray><error>
+      Try again in a minute.</gray>
+
+coalitions:
+  # Only these coalitions may play, by slug, name or id. Empty means all of the
+  # campus's 42cursus houses.
+  allow: []
+  #  allow: [the-federation, the-order, the-alliance, the-assembly]
+
+  # When a player belongs to several of them, the first match here wins.
+  # Otherwise the first one the intra returns does.
+  preferred: []
+
+  # Override the colour the intra reports, by slug or name. Useful when two
+  # houses look alike against grass.
+  colors: {}
+  #  colors:
+  #    the-federation: "#1B9AA6"
+
+display:
+  # Colour the name above the head and the tab list entry.
+  #
+  # Heads up: a name tag is drawn in the team's colour, and a team colour can
+  # only be one of the sixteen vanilla colours, so the name itself is drawn in
+  # the nearest one. The exact hex survives in the tab list, in chat and in
+  # tag-prefix below.
+  name-tags: true
+
+  # Colour the sender's name in chat.
+  chat: true
+
+  # MiniMessage drawn in front of every name -- above the head, in the tab list
+  # and in chat. "" for no tag at all.
+  #
+  #   <tag>        the house's short tag: the initial of its name, widened to
+  #                two letters when two houses would share one ([S], [G], [SE])
+  #   <coalition>  the house's full name
+  #   <c>...</c>   paints in the house's exact colour
+  tag-prefix: "<c>[<tag>]</c> "
+  #  tag-prefix: "<c>[<coalition>]</c> "
+
+pvp:
+  # Whether players of the same coalition can hurt each other.
+  friendly-fire: false
+
+  # Also stop arrows, splash potions and TNT thrown by a housemate. Effects that
+  # do no direct damage (poison, wither) still land either way.
+  cover-indirect: true
+
+  # Action bar shown to whoever swung, or "" for silence. Once every 3 seconds.
+  # <target> is the victim, <coalition> their house, <c>...</c> its colour.
+  friendly-fire-message: "<c><coalition></c> <gray>-- <white><target></white> is on your coalition.</gray>"
+
+cache:
+  # How long a resolved coalition is trusted, in minutes.
+  ttl-minutes: 360
+  # How long an "unknown login" answer is trusted, in minutes.
+  negative-ttl-minutes: 15
+  # Keep the cache across restarts (plugins/Coalitions/cache.json), so a whole
+  # campus reconnecting after a restart does not walk into the rate limit.
+  persist: true

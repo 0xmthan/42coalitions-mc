@@ -1,0 +1,6 @@
+# Bootstrapped by build.sh
+.tools/
+# Maven output
+target/
+# Real credentials
+.env

@@ -1,0 +1,18 @@
+name: Coalitions
+version: '${project.version}'
+main: fr.fortytwo.coalitions.CoalitionsPlugin
+api-version: '1.21'
+description: Groups players into their 42 Intra coalition -- coloured name tags, no friendly fire.
+author: 42
+commands:
+  coalition:
+    description: Inspect and manage coalition membership.
+    usage: /coalition <info|who|reload|refresh|lookup>
+    aliases: [coa, coal]
+permissions:
+  coalitions.use:
+    description: Use /coalition info and /coalition who.
+    default: true
+  coalitions.admin:
+    description: Use /coalition reload, refresh and lookup.
+    default: op
